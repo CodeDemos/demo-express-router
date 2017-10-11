@@ -13,13 +13,6 @@ app.use(morgan('common'));
 
 app.use(express.static('public'));
 
-app.get(['/', '/home', '/index'], (req, res) => {
-  res.sendFile(__dirname + '/views/home.html');
-});
-app.get('/about', (req, res) => {
-  res.sendFile(__dirname + '/views/about.html');
-});
-
 // Mount the router at the specified path (e.g. `/accounts`)
 // The “mount” path is stripped and so only the remaining path
 // is visible to the router

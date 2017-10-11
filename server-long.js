@@ -5,18 +5,9 @@ const morgan = require('morgan');
 
 const app = express();
 
-//NOTE: morgan is 'used' at this point, but the log appear after the request is sent
-// this is an feature of morgan so you can add details to the log during the req/res cycle
 app.use(morgan('common'));
 
 app.use(express.static('public'));
-
-app.get(['/', '/home', '/index'], (req, res) => {
-  res.sendFile(__dirname + '/views/home.html');
-});
-app.get('/about', (req, res) => {
-  res.sendFile(__dirname + '/views/about.html');
-});
 
 // ===== ACCOUNTS =====
 let currentId = 1000;
