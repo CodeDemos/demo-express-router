@@ -1,44 +1,101 @@
 'use strict';
+
 const express = require('express');
 const router = express.Router();
 
-let currentId = 1000;
+const simDB = require('../db/simDB');
+const customersData = require('../db/customers');
+const customers = simDB.initialize(customersData);
 
-router.get('/', getCustomerList);
+router.get('/', (req, res, next) => {
+  const { searchTerm } = req.query;
+  customers.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err);
+    }
+    res.json(list);
+  });
+});
 
-router.get('/:id', getCustomerById);
+router.get('/:id', (req, res, next) => {
+  const id = req.params.id;
 
-router.post('/', addCustomer);
+  customers.find(id, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next(); // goto 404
+    }
+  });
+});
 
-router.put('/', updateCustomer);
+router.post('/', (req, res, next) => {
+  const { name} = req.body;
 
-router.delete('/', deleteCustomer);
+  const newItem = { name };
+  /***** Never trust users - validate input *****/
+  if (!newItem.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
 
+  customers.create(newItem, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.location(`http://${req.headers.host}/api/customers/${item.id}`).status(201).json(item);
+    } else {
+      next();
+    }
+  });
+});
 
-function addCustomer(req, res) {
-  console.log('Create new Customer');
-  const id = currentId++;
-  res.location(req.originalUrl + id).status(201).json({});
-}
+router.put('/:id', (req, res, next) => {
+  const id = req.params.id;
 
-function updateCustomer(req, res) {
-  console.log('Update Customer');
-  res.json({});
-}
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateableFields = ['name'];
 
-function getCustomerById(req, res) {
-  console.log('Get Customer ' + req.params.id);
-  res.json({});
-}
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
 
-function getCustomerList(req, res) {
-  console.log('Get list of Customer');
-  res.json([{}, {}, {}, {}]); 
-}
+  /***** Never trust users - validate input *****/
+  if (!updateObj.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
 
-function deleteCustomer(req, res) {
-  console.log('Delete Customer');
-  res.sendStatus(204);
-}
+  customers.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
+});
+
+router.delete('/:id', (req, res, next) => {
+  const id = req.params.id;
+
+  customers.delete(id, (err) => {
+    if (err) {
+      return next(err);
+    }
+    res.sendStatus(204);
+  });
+});
 
 module.exports = router;

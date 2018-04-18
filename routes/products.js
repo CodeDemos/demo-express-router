@@ -1,43 +1,102 @@
 'use strict';
+
 const express = require('express');
 const router = express.Router();
 
-let currentId = 1000;
+const simDB = require('../db/simDB');
+const productData = require('../db/customers');
+const products = simDB.initialize(productData);
 
-const addProduct = (req, res) => {
-  console.log('Create new Product');
-  const id = currentId++;
-  res.location(req.originalUrl + id).status(201).json({});
-};
+router.get('/', (req, res, next) => {
+  const { searchTerm } = req.query;
 
-const updateProduct = (req, res) => {
-  console.log('Update Product');
-  res.json({});
-};
+  products.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err);
+    }
+    res.json(list);
+  });
+});
 
-const getProductById = (req, res) => {
-  console.log('Get Product ' + req.params.id);
-  res.json({});
-};
+router.get('/:id', (req, res, next) => {
+  const id = req.params.id;
 
-const getProductList = (req, res) => {
-  console.log('Get list of Product');
-  res.json([{}, {}, {}, {}]); 
-};
+  products.find(id, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next(); // goto 404
+    }
+  });
+});
 
-const deleteProduct = (req, res) => {
-  console.log('Delete Product');
-  res.sendStatus(204);
-};
+router.post('/', (req, res, next) => {
+  const { name} = req.body;
 
-router.get('/', getProductList);
+  const newItem = { name };
+  /***** Never trust users - validate input *****/
+  if (!newItem.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
 
-router.get('/:id', getProductById);
+  products.create(newItem, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.location(`http://${req.headers.host}//${item.id}`).status(201).json(item);
+    } else {
+      next();
+    }
+  });
+});
 
-router.post('/', addProduct);
+router.put('/:id', (req, res, next) => {
+  const id = req.params.id;
 
-router.put('/', updateProduct);
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateableFields = ['name'];
 
-router.delete('/', deleteProduct);
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
+
+  /***** Never trust users - validate input *****/
+  if (!updateObj.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  products.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
+});
+
+router.delete('/:id', (req, res, next) => {
+  const id = req.params.id;
+
+  products.delete(id, (err) => {
+    if (err) {
+      return next(err);
+    }
+    res.sendStatus(204);
+  });
+});
 
 module.exports = router;

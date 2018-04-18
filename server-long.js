@@ -2,139 +2,325 @@
 
 const express = require('express');
 const morgan = require('morgan');
-const bodyParser = require('body-parser');
+
+const { PORT } = require('./config');
+
+const simDB = require('./db/simDB');
+const accountsData = require('./db/accounts');
+const customersData = require('./db/customers');
+const productsData = require('./db/products');
+
+const accounts = simDB.initialize(accountsData);
+const customers = simDB.initialize(customersData);
+const products = simDB.initialize(productsData);
 
 const app = express();
 
-app.use(morgan('common'));
-
+app.use(morgan('dev'));
 app.use(express.static('public'));
+app.use(express.json());
 
-app.use(bodyParser.json());
+// ===== ACCOUNTS ==============================================================
 
-// ===== ACCOUNTS =====
-const accounts = require('./db/storage')('accounts');
+app.get('/api/accounts', (req, res, next) => {
+  const { searchTerm } = req.query;
 
-// Seed the dummy database
-accounts.addOne({ name: 'Business Foo' });
-accounts.addOne({ name: 'Corporation Bar' });
-accounts.addOne({ name: 'Partnership Baz' });
-accounts.addOne({ name: 'Enterprise Qux' });
-accounts.addOne({ name: 'Factory Nar' });
-
-app.use('/accounts', (req,res,next) => {
-  console.log('accounts', new Date(), req.method, req.url);
-  next();
+  accounts.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err);
+    }
+    res.json(list);
+  });
 });
 
-app.get('/accounts', (req, res) => {
-  const query = req.query;
-  const list = accounts.getList(query);
-  res.json(list);  
-});
-
-app.get('/accounts/:id', (req, res) => {
+app.get('/api/accounts/:id', (req, res, next) => {
   const id = req.params.id;
-  res.json(accounts.getOne(id));
+
+  accounts.find(id, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.post('/accounts', (req, res) => {  
-  const account = req.body;
-  const newItem = accounts.addOne(account);
-  res.location(`/accounts/${newItem.id}`).status(201).json(newItem);
+app.post('/api/accounts', (req, res, next) => {
+  const { name} = req.body;
+
+  const newItem = { name };
+  /***** Never trust users - validate input *****/
+  if (!newItem.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  accounts.create(newItem, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.location(`http://${req.headers.host}/api/accounts/${item.id}`).status(201).json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.put('/accounts/:id', (req, res) => {
+app.put('/api/accounts/:id', (req, res, next) => {
   const id = req.params.id;
-  const account = req.body;
-  res.json(accounts.modOne(id, account));
+
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateableFields = ['name'];
+
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
+
+  /***** Never trust users - validate input *****/
+  if (!updateObj.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  accounts.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.delete('/accounts/:id', (req, res) => {
+app.delete('/api/accounts/:id', (req, res, next) => {
   const id = req.params.id;
-  accounts.delOne(id);
-  return res.sendStatus(204);
+
+  accounts.delete(id, (err) => {
+    if (err) {
+      return next(err);
+    }
+    res.sendStatus(204);
+  });
 });
 
-// ===== CUSTOMERS =====
-const customers = require('./db/storage')('customers');
+// ===== CUSTOMERS =============================================================
 
-// Seed the dummy database
-customers.addOne({ name: 'Bob' });
-customers.addOne({ name: 'Jane' });
-customers.addOne({ name: 'Jose' });
-customers.addOne({ name: 'Marcus' });
-customers.addOne({ name: 'Marcia' });
-
-app.get('/customers', (req, res) => {
-  const query = req.query;
-  const list = customers.getList(query);
-  res.json(list);  
+app.get('/api/customers', (req, res, next) => {
+  const { searchTerm } = req.query;
+  customers.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err);
+    }
+    res.json(list);
+  });
 });
 
-app.get('/customers/:id', (req, res) => {
+app.get('/api/customers/:id', (req, res, next) => {
   const id = req.params.id;
-  res.json(customers.getOne(id));
+
+  customers.find(id, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.post('/customers', (req, res) => {
-  const customer = req.body;
-  const newItem = customers.addOne(customer);
-  res.location(`/customers/${newItem.id}`).status(201).json(newItem);
+app.post('/api/customers', (req, res, next) => {
+  const { name} = req.body;
+
+  const newItem = { name };
+  /***** Never trust users - validate input *****/
+  if (!newItem.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  customers.create(newItem, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.location(`http://${req.headers.host}/api/customers/${item.id}`).status(201).json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.put('/customers/:id', (req, res) => {
+app.put('/api/customers/:id', (req, res, next) => {
   const id = req.params.id;
-  const customer = req.body;
-  res.json(customers.modOne(id, customer));
+
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateableFields = ['name'];
+
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
+
+  /***** Never trust users - validate input *****/
+  if (!updateObj.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  customers.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.delete('/customers/:id', (req, res) => {
+app.delete('/api/customers/:id', (req, res, next) => {
   const id = req.params.id;
-  customers.delOne(id);
-  return res.sendStatus(204);
+
+  customers.delete(id, (err) => {
+    if (err) {
+      return next(err);
+    }
+    res.sendStatus(204);
+  });
 });
 
-// ===== PRODUCT =====
-const products = require('./db/storage')('products');
+// ===== PRODUCTS ==============================================================
 
-// Seed the dummy database
-products.addOne({ name: 'Widget' });
-products.addOne({ name: 'Thing' });
-products.addOne({ name: 'Gadget' });
-products.addOne({ name: 'Item' });
-products.addOne({ name: 'Part' });
+app.get('/api/products', (req, res, next) => {
+  const { searchTerm } = req.query;
 
-
-app.get('/products', (req, res) => {
-  const query = req.query;
-  const list = products.getList(query);
-  res.json(list);  
+  products.filter(searchTerm, (err, list) => {
+    if (err) {
+      return next(err);
+    }
+    res.json(list);
+  });
 });
 
-app.get('/products/:id', (req, res) => {
+app.get('/api/products/:id', (req, res, next) => {
   const id = req.params.id;
-  res.json(products.getOne(id));
+
+  products.find(id, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.post('/products', (req, res) => {
-  const item = req.body;
-  const newItem = products.addOne(item);
-  res.location(`/products/${newItem.id}`).status(201).json(newItem);
+app.post('/api/products', (req, res, next) => {
+  const { name} = req.body;
+
+  const newItem = { name };
+  /***** Never trust users - validate input *****/
+  if (!newItem.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  products.create(newItem, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.location(`http://${req.headers.host}/api/products/${item.id}`).status(201).json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.put('/products/:id', (req, res) =>{
+app.put('/api/products/:id', (req, res, next) => {
   const id = req.params.id;
-  const item = req.body;
-  res.json(products.modOne(id, item));
+
+  /***** Never trust users - validate input *****/
+  const updateObj = {};
+  const updateableFields = ['name'];
+
+  updateableFields.forEach(field => {
+    if (field in req.body) {
+      updateObj[field] = req.body[field];
+    }
+  });
+
+  /***** Never trust users - validate input *****/
+  if (!updateObj.name) {
+    const err = new Error('Missing `name` in request body');
+    err.status = 400;
+    return next(err);
+  }
+
+  products.update(id, updateObj, (err, item) => {
+    if (err) {
+      return next(err);
+    }
+    if (item) {
+      res.json(item);
+    } else {
+      next();
+    }
+  });
 });
 
-app.delete('/products/:id', (req, res) => {
+app.delete('/api/products/:id', (req, res, next) => {
   const id = req.params.id;
-  products.delOne(id);
-  return res.sendStatus(204);
+
+  products.delete(id, (err) => {
+    if (err) {
+      return next(err);
+    }
+    res.sendStatus(204);
+  });
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log(`Your app is listening on port ${process.env.PORT || 8080}`);
+// Catch-all 404
+app.use(function (req, res, next) {
+  const err = new Error('Not Found');
+  err.status = 404;
+  next(err);
+});
+
+// Catch-all Error handler
+// NOTE: we'll prevent stacktrace leak in later exercise
+app.use(function (err, req, res, next) {
+  res.status(err.status || 500);
+  res.json({
+    message: err.message,
+    error: err
+  });
+});
+
+// Listen for incoming connections
+app.listen(PORT, function () {
+  console.info(`Server listening on ${this.address().port}`);
+}).on('error', err => {
+  console.error(err);
 });
